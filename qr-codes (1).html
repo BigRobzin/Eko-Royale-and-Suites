@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eko Royale Hotel &amp; Suites — Room QR Code Generator</title>
+<script src="https://cdn.jsdelivr.net/npm/qr-code-styling@^1.6/lib/qr-code-styling.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --navy:#0B1F3A; --gold:#C9A227; --ivory:#F7F5EF; --bronze:#8C6D3F; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:'Inter',sans-serif; background:var(--ivory); color:#1C2230; }
+  .font-serif{ font-family:'Fraunces',serif; }
+
+  header{ background:var(--navy); color:#fff; padding:28px 20px; }
+  header h1{ margin:0 0 4px; font-size:22px; }
+  header p{ margin:0; color:#C9A227; font-size:13px; letter-spacing:.05em; }
+
+  .controls{ max-width:900px; margin:0 auto; padding:20px; }
+  .controls label{ display:block; font-size:13px; color:#1C223099; margin-bottom:6px; }
+  .controls .row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .controls input{ flex:1; min-width:220px; padding:12px 14px; border:1px solid #1C223033; border-radius:10px; font-size:14px; }
+  .controls button{ background:var(--navy); color:#fff; border:none; padding:12px 20px; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; }
+  .controls button.secondary{ background:var(--gold); color:var(--navy); }
+  .hint{ font-size:12px; color:#1C223066; margin-top:8px; }
+
+  .grid{ max-width:1100px; margin:0 auto; padding:0 20px 60px; display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:20px; }
+
+  /* ---- Card design ---- */
+  .card{
+    background: var(--navy);
+    border-radius: 20px;
+    padding: 3px;
+    background-image: linear-gradient(160deg, var(--gold), #7a5f2e);
+  }
+  .card-inner{
+    background: var(--navy);
+    border-radius: 18px;
+    padding: 18px 16px 16px;
+    text-align: center;
+    color: #fff;
+    position: relative;
+  }
+  .card-inner::before, .card-inner::after{
+    content:'';
+    position:absolute; width:18px; height:18px;
+    border: 2px solid var(--gold);
+  }
+  .card-inner::before{ top:8px; left:8px; border-right:none; border-bottom:none; }
+  .card-inner::after{ bottom:8px; right:8px; border-left:none; border-top:none; }
+  .brand{ font-size:9px; letter-spacing:.16em; color:var(--gold); text-transform:uppercase; margin-bottom:2px; }
+  .hotel-name{ font-family:'Fraunces',serif; font-size:13px; margin-bottom:10px; opacity:.9; }
+  .cat{ font-size:10px; letter-spacing:.1em; color:var(--gold); text-transform:uppercase; margin-bottom:2px; }
+  .room{ font-family:'Fraunces',serif; font-size:26px; margin-bottom:12px; }
+  .qr-wrap{ background:#fff; border-radius:14px; padding:12px; display:inline-block; margin-bottom:12px; }
+  .instruction{ font-size:11px; color:#ffffffcc; letter-spacing:.03em; margin-bottom:2px; }
+  .instruction b{ color:var(--gold); }
+  a.dl{ display:inline-block; font-size:11px; color:var(--gold); text-decoration:underline; cursor:pointer; margin-top:6px; }
+
+  @media print{
+    header, .controls{ display:none; }
+    body{ background:#fff; }
+    .grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:26px; padding:24px; }
+    .card{ break-inside:avoid; page-break-inside:avoid; }
+    a.dl{ display:none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 class="font-serif">Eko Royale Hotel &amp; Suites</h1>
+  <p>ROOM QR CODE GENERATOR</p>
+</header>
+
+<div class="controls">
+  <label for="baseUrl">Your deployed site URL</label>
+  <div class="row">
+    <input id="baseUrl" type="text" placeholder="e.g. https://k-c-royal-suites.netlify.app/index.html" value="https://k-c-royal-suites.netlify.app/index.html">
+    <button onclick="generateAll()">Generate QR Codes</button>
+    <button class="secondary" onclick="window.print()">Print All</button>
+  </div>
+  <p class="hint">Each card is styled and ready to print — cut along the card edge and place one in each room. "Download PNG" on a card saves that one image individually.</p>
+</div>
+
+<div id="grid" class="grid"></div>
+
+<script>
+const ROOM_MAP = {};
+[104,105,113].forEach(r => ROOM_MAP[r] = "Standard");
+[101,102,103,106,107,108,109,110,111,112,114,117,118,119].forEach(r => ROOM_MAP[r] = "Deluxe");
+[115,116].forEach(r => ROOM_MAP[r] = "Classic");
+[120,121,122,123,124].forEach(r => ROOM_MAP[r] = "Executive Deluxe");
+
+const rooms = Object.keys(ROOM_MAP).map(Number).sort((a,b)=>a-b);
+
+// Small brand mark rendered in the center of every QR code — a data URI so it
+// never needs a network fetch (keeps it reliable when printing/downloading).
+const LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120">' +
+  '<circle cx="60" cy="60" r="56" fill="#0B1F3A" stroke="#C9A227" stroke-width="6"/>' +
+  '<text x="60" y="72" font-family="Georgia, serif" font-size="44" fill="#C9A227" text-anchor="middle" font-weight="700">ER</text>' +
+  '</svg>';
+const LOGO_DATA_URI = 'data:image/svg+xml;utf8,' + encodeURIComponent(LOGO_SVG);
+
+function generateAll(){
+  const raw = document.getElementById('baseUrl').value.trim();
+  const base = raw || 'https://your-site.netlify.app/index.html';
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  rooms.forEach(room => {
+    const url = base + (base.includes('?') ? '&' : '?') + 'room=' + room;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-inner">
+        <div class="brand">Eko Royale</div>
+        <div class="hotel-name">Hotel &amp; Suites</div>
+        <div class="cat">${ROOM_MAP[room]} Room</div>
+        <div class="room">Room ${room}</div>
+        <div class="qr-wrap" id="qr-${room}"></div>
+        <div class="instruction">Scan with your phone camera to</div>
+        <div class="instruction"><b>Order Room Service</b></div>
+        <a class="dl" data-room="${room}">Download PNG</a>
+      </div>
+    `;
+    grid.appendChild(card);
+
+    const qrCode = new QRCodeStyling({
+      width: 190,
+      height: 190,
+      margin: 8,
+      data: url,
+      qrOptions: { errorCorrectionLevel: 'H' },
+      dotsOptions: { type: 'rounded', color: '#0B1F3A' },
+      cornersSquareOptions: { type: 'extra-rounded', color: '#C9A227' },
+      backgroundOptions: { color: '#ffffff' },
+      image: LOGO_DATA_URI,
+      imageOptions: { imageSize: 0.24, margin: 6, hideBackgroundDots: true }
+    });
+    qrCode.append(document.getElementById('qr-' + room));
+
+    setTimeout(() => {
+      const link = card.querySelector('a.dl');
+      link.addEventListener('click', () => {
+        const canvas = card.querySelector('canvas');
+        if(!canvas) return;
+        const a = document.createElement('a');
+        a.href = canvas.toDataURL('image/png');
+        a.download = 'room-' + room + '-qr.png';
+        a.click();
+      });
+    }, 80);
+  });
+}
+
+generateAll();
+</script>
+</body>
+</html>
